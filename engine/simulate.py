@@ -196,8 +196,13 @@ def build_community_edges(people, reactions, links_per_person, radius_by_communi
 
 
 # ---------- 가게 위치 ----------
+STORE_OVERRIDE = {}  # 사용자가 지도에서 찍은 가게 자리 {동코드: (위도, 경도)}
+
+
 def store_point(dong_code, people, geo):
-    """가게 위치 = 후보 동의 중심점 (경계 파일 우선, 없으면 그 동 주민 평균 좌표)"""
+    """가게 위치 = 사용자가 찍은 자리가 있으면 그것, 없으면 후보 동의 중심점 (경계 파일 우선, 없으면 그 동 주민 평균 좌표)"""
+    if dong_code in STORE_OVERRIDE:
+        return STORE_OVERRIDE[dong_code]
     if geo:
         for feat in geo.get("features", []):
             if str(feat["properties"].get("adm_cd2")) == dong_code:
@@ -576,7 +581,8 @@ def simulate(dong_code, dong, people, edges, reactions, geo, w, seed, stats=None
         promo_out = promo_mod.plan(model)
 
     mean = lambda xs: sum(xs) / len(xs)
-    return {"dong_code": dong_code, "dong": dong, "seed": main["seed"], "steps": main["steps"],
+    return {"dong_code": dong_code, "dong": dong, "store_location": [round(slat, 6), round(slng, 6)],
+            "seed": main["seed"], "steps": main["steps"],
             "visitors": int(round(mean([r["visitors"] for r in rows]))),
             "stopped_at": stopped_at,
             "visitors_demand": int(round(mean([r["demand"] for r in rows]))),
@@ -630,6 +636,9 @@ def main():
     geo = load_json(folder / "dongs.geojson") if (folder / "dongs.geojson").exists() else None
     scenario = load_json(folder / "scenario.json") if (folder / "scenario.json").exists() else {}
     scenario["_promo"] = not args.all_dongs and not args.no_promo
+    for code, ll in (scenario.get("store_locations") or {}).items():
+        if ll and len(ll) == 2:
+            STORE_OVERRIDE[str(code)] = (float(ll[0]), float(ll[1]))
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import promo as _promo_mod
