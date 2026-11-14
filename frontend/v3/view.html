@@ -61,6 +61,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--ink); outline-o
 .detail .close:hover { background: #333333; }
 .detail .tip { background: #FFF1C2; border-radius: 16px; padding: 14px 18px; margin: 10px 0; }
 .scroll-x { overflow-x: auto; }
+table.plan { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 15px; border: 1.5px solid var(--ink); border-radius: 20px; overflow: hidden; background: #FFFFFF; }
+table.plan th { text-align: left; padding: 12px 14px; background: #FFF4D6; font-size: 14px; font-weight: 700; border-bottom: 1.5px solid var(--ink); }
+table.plan td { padding: 14px; border-bottom: 1px solid #EADFCB; vertical-align: top; line-height: 1.5; }
+table.plan tr:last-child td { border-bottom: none; }
+table.plan td.n, table.plan th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .box { border-right: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line); padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .span2 { grid-column: span 2; } .span3 { grid-column: span 3; }
 #map { height: 520px; border: 1px solid #E3DED3; background: #F3EFE7; }
@@ -312,7 +317,12 @@ function renderResult(code) {
       <section class="box clickable" style="justify-content:space-between" data-detail="hub" tabindex="0" role="button" aria-label="입소문 허브 자세히 보기"><span class="label"><span class="dot" style="background:#111"></span>Hub</span>
         ${x.hub && x.hub.reach_hub ? `<span class="num" style="font-size:56px;line-height:1">${Number(x.hub.reach_hub).toFixed(1)}<span style="font-size:18px;margin-left:4px">명</span></span><span style="font-size:14px">허브 1명이 전한 평균 인원 · 보통 사람의 ${x.hub.ratio}배</span>` : '<span class="muted">-</span>'}${MORE}</section>
       <section class="box clickable" style="justify-content:space-between" data-detail="validation" tabindex="0" role="button" aria-label="검증 자세히 보기"><span class="label"><span class="dot" style="background:#111"></span>Validation</span>
-        ${DATA.validation ? `<span class="num" style="font-size:56px;line-height:1">${DATA.validation.rank_corr >= 0 ? '+' : ''}${Number(DATA.validation.rank_corr).toFixed(2)}</span><span style="font-size:14px">${esc(DATA.validation.target)} · 실제 카페 매출 순위와의 상관</span>` : '<span class="muted">검증 기록 없음</span>'}${MORE}</section>
+        ${DATA.validation ? `<span class="num" style="font-size:56px;line-height:1">${DATA.validation.rank_corr >= 0 ? '+' : ''}${Number(DATA.validation.rank_corr).toFixed(2)}</span><span style="font-size:15px;font-weight:700">${verdict(DATA.validation.rank_corr).short}</span><span style="font-size:14px">실제 카페 매출 순위와 비교한 점수 (-1 ~ 1)</span>` : '<span class="muted">검증 기록 없음</span>'}${MORE}</section>
+      <section class="box" style="grid-column:1 / -1" aria-label="12주 실행 계획">
+        <span class="label"><span class="dot"></span>Plan</span>
+        <h3 style="margin:0;font-size:28px;font-weight:900;letter-spacing:-0.02em">12주 실행 계획</h3>
+        ${planHTML(x)}
+      </section>
       <div id="dim" class="dim" hidden></div>
       <div id="detail" class="detail" hidden role="dialog" aria-modal="false" aria-labelledby="detail-title"></div>
     </div>
@@ -325,6 +335,76 @@ function renderResult(code) {
     box.addEventListener('click', open);
     box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
+}
+
+/* ---------- 검증을 쉬운 말로 ---------- */
+function verdict(r) {
+  r = Number(r);
+  if (r >= 0.5) return { short: '동네 순위를 잘 맞혀요', long: '이 서비스가 좋다고 본 동네는 실제로도 카페 매출이 높은 경우가 많아요.' };
+  if (r >= 0.3) return { short: '동네 순위를 어느 정도 맞혀요', long: '이 서비스가 좋다고 본 동네는 실제로도 카페 매출이 높은 편이에요.' };
+  if (r >= 0.1) return { short: '동네 순위를 대략적으로 맞혀요', long: '이 서비스가 좋다고 본 동네가 실제로도 카페 매출이 높은 경향은 있지만, 강하지는 않아요.' };
+  if (r > -0.1) return { short: '아직 순위를 잘 못 맞혀요', long: '이 서비스의 동네 순위와 실제 카페 매출 순위 사이에 뚜렷한 관계가 없어요.' };
+  return { short: '순위가 실제와 반대예요', long: '이 서비스가 좋다고 본 동네의 실제 카페 매출이 오히려 낮은 편이에요.' };
+}
+function gauge(r) {
+  const x = 20 + (Number(r) + 1) / 2 * 560;
+  return `<svg viewBox="0 0 600 86" width="100%" style="max-width:600px" role="img" aria-label="점수 ${Number(r).toFixed(2)}, -1부터 1 사이">
+    <line x1="20" y1="40" x2="580" y2="40" stroke="#111" stroke-width="2"/>
+    ${[[-1, '반대'], [0, '관계 없음'], [1, '완전히 같음']].map(([v, t]) => { const px = 20 + (v + 1) / 2 * 560;
+      return `<line x1="${px}" y1="32" x2="${px}" y2="48" stroke="#111" stroke-width="2"/><text x="${px}" y="72" font-size="13" text-anchor="${v === -1 ? 'start' : v === 1 ? 'end' : 'middle'}" fill="#595959">${v} ${t}</text>`; }).join('')}
+    <circle cx="${x}" cy="40" r="13" fill="#F5B301" stroke="#FFFFFF" stroke-width="4"/><circle cx="${x}" cy="40" r="13" fill="none" stroke="#D9C79E"/>
+    <text x="${x}" y="18" font-size="14" font-weight="700" text-anchor="middle" fill="#111">${Number(r).toFixed(2)}</text>
+  </svg>`;
+}
+
+/* ---------- 12주 실행 계획 ---------- */
+const UNIT = { '당근': 300, '인스타': 18, '체험단': 100000, '맘카페': 200000, '허브쿠폰': 20000 };  // 원 (인스타는 노출 1회)
+function topGroupsFor(cs, ch, n = 2, cnt = {}) {
+  // 인원이 너무 적은 집단(20명 미만)은 비율이 튀어서 제외
+  return Object.entries(cs).filter(([g0]) => !cnt[g0] || cnt[g0] >= 20).map(([g0, m]) => [g0, m[ch] || 0]).filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]).slice(0, n).map(([g0]) => g(g0));
+}
+function planHTML(x) {
+  const d = x.detail || {}, bp = d.budget_plan || {}, cs = d.channel_share || {}, ct = x.channels || {};
+  const rp = d.repromo || {}, hubs = d.hubs || [], pres = d.prescriptions || [], cnt = d.group_count || {};
+  const stall = rp.week || 7;
+  const whenOf = t => t === '오픈전' ? [0, '오픈 1주 전'] : t === '정체기' ? [stall, `${stall}주 차`] : [1, '오픈 주'];
+  const won = v => v >= 10000 ? `${fmt(Math.round(v / 10000))}만 원` : `${fmt(v)}원`;
+  const rows = [];
+  if (F.promo && bp.split) {
+    for (const [ch, b] of Object.entries(bp.split)) {
+      const [ord, when] = whenOf((bp.timing || {})[ch]);
+      const qty = { '당근': `동네 광고, 가게 반경 1.5km · 클릭 약 ${fmt(Math.round(b / UNIT['당근']))}번`,
+        '인스타': `지역 타깃 광고 · 노출 약 ${fmt(Math.round(b / UNIT['인스타']))}회`,
+        '체험단': `동네 블로거 체험단 ${fmt(Math.max(1, Math.round(b / UNIT['체험단'])))}명 초대`,
+        '맘카페': `지역 맘카페(회원 1만 명) 배너 ${Math.max(1, Math.round(b / UNIT['맘카페']))}달`,
+        '허브쿠폰': `입소문 허브에게 첫 방문 쿠폰 ${fmt(Math.round(b / UNIT['허브쿠폰']))}장` }[ch] || ch;
+      const who = ch === '허브쿠폰' ? (hubs[0] ? [g(hubs[0].group)] : []) : topGroupsFor(cs, ch, 2, cnt);
+      rows.push([ord, when, `<b>${esc(ch)}</b> ${qty}`, who.join(', ') || '동네 전체', won(b), `홍보 추천 배분 · ${esc((bp.timing || {})[ch] || '')}에 가장 효과적`]);
+    }
+    if (bp.open_discount) {
+      const price = pres.find(p => p.reason_type === '가격');
+      rows.push([1, '오픈 주', '<b>오픈 할인</b> 첫 2주 20%', price ? g(price.group) : '가격이 부담인 손님', `약 ${won(bp.discount_cost || 0)}`, '할인해준 금액만큼 비용']);
+    }
+  } else {
+    rows.push([1, '오픈 주', '<b>당근</b> 동네생활에 가게 소개 글 올리기', topGroupsFor(cs, '당근', 2, cnt).join(', ') || '동네 이웃', '무료', `당근으로 알게 되는 비율 ${pct(ct['당근'] || 0)}`]);
+  }
+  if ((ct['검색'] || 0) >= 0.08) rows.push([1, '오픈 주', '<b>네이버 지도</b> 가게 등록, 첫 손님에게 사진 후기 부탁', '검색해서 찾는 손님', '무료', `검색으로 알게 되는 비율 ${pct(ct['검색'])} · 후기가 쌓일수록 늘어요`]);
+  if ((ct['지나가다'] || 0) >= 0.08) rows.push([1, '오픈 주', '<b>가게 앞</b> 입간판·바깥 메뉴판으로 가격 보이게', '가게 앞을 지나는 사람', '-', `지나가다 들어오는 비율 ${pct(ct['지나가다'])}`]);
+  if (hubs.length) {
+    const comm = {};
+    hubs.forEach(h => (h.community || []).forEach(c => comm[c] = (comm[c] || 0) + 1));
+    const topC = Object.entries(comm).sort((a, b) => b[1] - a[1])[0];
+    rows.push([2, '1~2주 차', `<b>입소문 허브</b>에게 시식·첫 방문 쿠폰${topC ? `, ${esc(topC[0])}에 후기 부탁` : ''}`, g(hubs[0].group), '-', ((d.hub_vs_broad || {}).reach_hub ? `허브 1명이 평균 ${d.hub_vs_broad.reach_hub}명에게 전해요` : `가장 많이 전한 사람은 ${fmt(hubs[0].reach)}명에게 소식을 퍼뜨렸어요`)]);
+  }
+  pres.slice(0, 2).forEach(p => rows.push([3, '2~4주 차', `<b>${esc(p.channel)}</b>로 ${esc(p.offer)}`, g(p.group), '-', `이 집단은 소식이 ${pct(p.awareness)}에게만 닿았어요 (전체 ${pct(p.overall_awareness)})`]));
+  if (rp.week) rows.push([rp.week, `${rp.week}주 차`, '<b>다시 알리기</b> 재방문 쿠폰·기간 한정 메뉴', '이미 온 손님과 이웃', '-', `손님이 줄기 시작하는 때 · 12주 동안 +${fmt(rp.gain)}명`]);
+  rows.sort((a, b) => a[0] - b[0]);
+  const head = F.promo && bp.visitors_gain ? `<p style="margin:0;font-size:16px">이대로 하면 12주 동안 손님이 약 <b>${fmt(bp.visitors_gain)}명</b> 더 오고, ${bp.payback_week ? `<b>${bp.payback_week}주 차</b>에 광고비를 돌려받아요.` : '12주 안에는 광고비를 다 돌려받지 못해요.'}</p>`
+    : '<p class="muted" style="margin:0;font-size:15px">홍보 예산을 넣으면 채널별 예산과 시기까지 채워져요.</p>';
+  return head + `<div class="scroll-x"><table class="plan"><thead><tr><th>언제</th><th>무엇을</th><th>누구에게</th><th class="n">예산</th><th>왜</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td style="white-space:nowrap;font-weight:700">${r[1]}</td><td>${r[2]}</td><td>${esc(r[3])}</td><td class="n" style="white-space:nowrap">${r[4]}</td><td class="muted">${r[5]}</td></tr>`).join('')}</tbody></table></div>
+    <p class="muted" style="margin:0;font-size:13px">광고 단가는 조사한 평균 단가 기준이에요 (당근 클릭당 300원, 인스타 노출 1,000회당 1.8만 원, 체험단 1명 10만 원, 맘카페 배너 월 20만 원).</p>`;
 }
 
 /* ---------- 자세히 보기 ---------- */
@@ -428,15 +508,32 @@ function detailHub(x, d) {
 
 function detailValidation() {
   const all = DATA.validation_all || [];
-  if (!all.length) return '<h2 id="detail-title">검증 기록이 없어요</h2><p style="margin-top:12px">validation_log.json을 frontend/data/real에 넣으면 여기에 보여요.</p>';
-  let out = `<span class="label"><span class="dot" style="background:#111"></span>Validation</span><h2 id="detail-title">이 예측을 얼마나 믿을 수 있나</h2>
-    <p style="margin-top:12px">시뮬레이션이 꼽은 동네 순위와 실제 카페 매출 순위를 비교했어요. 1이면 순서가 완전히 같고, 0이면 관계가 없고, -1이면 반대예요.</p>
-    ${table(['회차', '대상', '순위 상관', '절반 A', '절반 B'], all.map(v => [v.round ?? '-', esc(v.target || '-'), v.rank_corr ?? '-', v.group_a_corr ?? '-', v.group_b_corr ?? '-']), [2, 3, 4])}`;
-  const last = all[all.length - 1];
-  if (last.channel_gap_pp) out += `<h3>유입 경로를 설문과 비교</h3>${table(['경로', '시뮬레이션 − 설문'], Object.entries(last.channel_gap_pp).map(([k, v]) => [esc(k), (v > 0 ? '+' : '') + Number(v).toFixed(1) + '%p']), [1])}`;
-  if (last.survival_validation && typeof last.survival_validation === 'object') out += `<h3>손익분기와 실제 생존율</h3><p>${esc(last.survival_validation.interpretation || '')}</p>`;
-  if (last.mismatch) out += `<h3>아직 맞지 않는 부분</h3><ul>${[].concat(last.mismatch).map(m => `<li>${esc(m)}</li>`).join('')}</ul>`;
-  if (last.next) out += `<h3>다음에 할 일</h3><p>${esc(last.next)}</p>`;
+  if (!all.length) return '<h2 id="detail-title">검증 기록이 없어요</h2>';
+  const last = all[all.length - 1], r = Number(last.rank_corr), v = verdict(r);
+  let out = `<span class="label"><span class="dot" style="background:#111"></span>Validation</span>
+    <h2 id="detail-title">${v.short}</h2>
+    <p style="margin-top:12px">서울 ${esc(String(last.target || '').match(/\d+/) ? String(last.target).match(/\d+/)[0] + '개 동' : '여러 동네')}에서, 이 서비스가 매긴 동네 순위를 실제 카페 매출 순위와 비교했어요. ${v.long}</p>
+    ${gauge(r)}
+    <p class="tip"><b>이렇게 쓰세요.</b> 동네끼리 어디가 더 나은지 <b>비교하는 용도</b>로 보시고, 손님 수는 정확한 값보다 대략적인 크기로 봐주세요.</p>
+    <h3>알아두면 좋은 점</h3><ul>`;
+  if (all.length > 1) out += `<li>처음 검증에서는 ${Number(all[0].rank_corr).toFixed(2)}로 순위가 거꾸로였는데, 유동인구·직장인구를 반영한 뒤 ${r.toFixed(2)}로 좋아졌어요.</li>`;
+  if (last.group_a_corr != null && last.group_b_corr != null)
+    out += Math.abs(last.group_a_corr - last.group_b_corr) > 0.1
+      ? '<li>동네를 반으로 나눠 따로 확인했더니 <b>지역에 따라 정확도가 달라요.</b> 어떤 지역에선 잘 맞고 어떤 지역에선 덜 맞아요.</li>'
+      : '<li>동네를 반으로 나눠 따로 확인해도 비슷하게 맞아서, 특정 동네에만 맞춘 결과는 아니에요.</li>';
+  if (last.channel_gap_pp) {
+    const [k, gap] = Object.entries(last.channel_gap_pp).sort((a2, b2) => Math.abs(b2[1]) - Math.abs(a2[1]))[0];
+    const name = { '지나가다': '가게 앞을 지나다 들어오는 손님', '네이버검색': '검색해서 찾아오는 손님', '인스타': '인스타로 알게 된 손님', '당근커뮤니티': '당근으로 알게 된 손님' }[k] || k;
+    out += `<li>설문과 비교하면 <b>${esc(name)}을 실제보다 ${gap < 0 ? '적게' : '많게'}</b> 잡는 편이에요 (${Math.abs(gap).toFixed(0)}%p 차이). 실제로는 이 경로 손님이 조금 더 많을 수 있어요.</li>`;
+  }
+  const sv = last.survival_validation;
+  if (sv && typeof sv === 'object') out += `<li>손익분기를 넘긴 동네가 실제로 가게가 더 오래 살아남는 경향은 보였어요 (생존율 ${sv.mean_survival_bep_achieved_pct}% vs ${sv.mean_survival_bep_null_pct}%). 다만 비교한 동이 ${sv.matched_dongs}곳뿐이라 확실하다고 하긴 어려워요.</li>`;
+  out += '</ul>';
+  out += `<details style="margin-top:28px"><summary style="cursor:pointer;font-weight:700">자세한 수치 보기</summary>
+    ${table(['회차', '대상', '순위 상관', '절반 A', '절반 B'], all.map(v2 => [v2.round ?? '-', esc(v2.target || '-'), v2.rank_corr ?? '-', v2.group_a_corr ?? '-', v2.group_b_corr ?? '-']), [2, 3, 4])}
+    ${last.channel_gap_pp ? table(['경로', '시뮬레이션 − 설문'], Object.entries(last.channel_gap_pp).map(([k, v2]) => [esc(k), (v2 > 0 ? '+' : '') + Number(v2).toFixed(1) + '%p']), [1]) : ''}
+    ${sv && typeof sv === 'object' ? `<p style="margin-top:12px">${esc(sv.interpretation || '')}</p>` : ''}
+    ${last.next ? `<p class="muted">다음 검증: ${esc(last.next)}</p>` : ''}</details>`;
   return out;
 }
 

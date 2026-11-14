@@ -187,6 +187,7 @@ def build_dong(r, steps_per_week):
             "weekly": r.get("weekly_visitors"), "repromo": r.get("repromo"), "assumptions": r.get("assumptions") or {},
             "scenarios": r.get("scenarios") or [], "budget_plan": bp, "hub_vs_broad": hv, "hubs": r.get("hubs") or [],
             "channel_share": r.get("channel_share") or {}, "group_awareness": r.get("group_awareness") or {},
+            "group_count": r.get("group_count") or {},
             "prescriptions": r.get("prescriptions") or [], "diagnosis": r.get("diagnosis"),
             "revision_changes": rev.get("changes") or [],
         },
@@ -509,7 +510,7 @@ elif page == "home":
     payload["idea"] = examples_idea
 
 html = VIEW.read_text(encoding="utf-8").replace("__DATA__", json.dumps(payload, ensure_ascii=False))
-heights = {"home": 520, "result": 2300, "how": 1500}
+heights = {"home": 520, "result": 2900, "how": 1500}
 components.html(html, height=heights.get(page, 1200), scrolling=False)
 
 if st.query_params.get("debug") == "1":
